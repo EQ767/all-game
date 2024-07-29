@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eric's像素贪吃蛇游戏</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        #gameCanvas {
+            border: 1px solid black;
+            background-color: #fff;
+        }
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .score {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .control-button {
+            padding: 10px;
+            margin: 5px;
+            font-size: 24px;
+            background-color: #333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 80px;
+            height: 80px;
+        }
+        .control-icon {
+            width: 40px;
+            height: 40px;
+            fill: white;
+        }
+        .start-button, .restart-button, .fullscreen-button {
+            margin-top: 20px;
+            background-color: #28a745;
+            width: 120px;
+        }
+        .control-button:active {
+            background-color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="score">得分: <span id="score">0</span></div>
+        <canvas id="gameCanvas" width="800" height="800"></canvas>
+        <div class="controls">
+            <button class="control-button" id="upButton">
+                <svg class="control-icon" viewBox="0 0 24 24">
+                    <path d="M12 2l-10 10h6v10h8v-10h6z"/>
+                </svg>
+            </button>
+            <button class="control-button" id="leftButton">
+                <svg class="control-icon" viewBox="0 0 24 24">
+                    <path d="M2 12l10-10v6h10v8h-10v6z"/>
+                </svg>
+            </button>
+            <button class="control-button" id="rightButton">
+                <svg class="control-icon" viewBox="0 0 24 24">
+                    <path d="M22 12l-10 10v-6h-10v-8h10v-6z"/>
+                </svg>
+            </button>
+            <button class="control-button" id="downButton">
+                <svg class="control-icon" viewBox="0 0 24 24">
+                    <path d="M12 22l10-10h-6v-10h-8v10h-6z"/>
+                </svg>
+            </button>
+        </div>
+        <button class="control-button start-button" id="startButton">开始</button>
+        <button class="control-button restart-button" id="restartButton">重来</button>
+        <button class="control-button fullscreen-button" id="fullscreenButton">全屏</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        const gridSize = 20;
+        const tileCount = canvas.width / gridSize;
+        let snake = [{ x: 20, y: 20 }];
+        let direction = { x: 0, y: 0 };
+        let pendingDirection = { x: 0, y: 0 };
+        let foods = [];
+        let score = 0;
+        let speed = 150;
+        let gameRunning = false;
+        let gamePaused = true;
+
+        function drawGame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            drawSnake();
+            drawFood();
+
+            if (!gamePaused) {
+                moveSnake();
+                if (isGameOver()) {
+                    alert("游戏结束！得分: " + score);
+                    resetGame();
+                    return;
+                }
+            }
+
+            setTimeout(drawGame, speed);
+        }
+
+        function drawSnake() {
+            ctx.fillStyle = "green";
+            snake.forEach(segment => {
+                ctx.fillRect(segment.x * gridSize, segment.y * gridSize, gridSize, gridSize);
+            });
+        }
+
+        function drawFood() {
+            foods.forEach(food => {
+                ctx.fillStyle = food.type === 'big' ? 'blue' : 'red';
+                ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
+            });
+        }
+
+        function moveSnake() {
+            if ((pendingDirection.x !== -direction.x || pendingDirection.y !== -direction.y) && !(pendingDirection.x === 0 && pendingDirection.y === 0)) {
+                direction = pendingDirection;
+            }
+
+            const head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
+            snake.unshift(head);
+
+            const foodIndex = foods.findIndex(food => food.x === head.x && food.y === head.y);
+            if (foodIndex !== -1) {
+                const food = foods[foodIndex];
+                if (food.type === 'big') {
+                    score += 2;
+                    snake.push({});
+                    snake.push({});
+                } else {
+                    score += 1;
+                    snake.push({});
+                }
+                document.getElementById("score").textContent = score;
+                foods.splice(foodIndex, 1);
+                placeFood();
+            } else {
+                snake.pop();
+            }
+        }
+
+        function isGameOver() {
+            const head = snake[0];
+            if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+                return true;
+            }
+            for (let i = 1; i < snake.length; i++) {
+                if (snake[i].x === head.x && snake[i].y === head.y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function placeFood() {
+            let foodType = Math.random() < 0.8 ? 'small' : 'big';
+            let food;
+            do {
+                food = {
+                    x: Math.floor(Math.random() * tileCount),
+                    y: Math.floor(Math.random() * tileCount),
+                    type: foodType
+                };
+            } while (snake.some(segment => segment.x === food.x && segment.y === food.y));
+            foods.push(food);
+        }
+
+        function resetGame() {
+            snake = [{ x: 20, y: 20 }];
+            direction = { x: 0, y: 0 };
+            pendingDirection = { x: 0, y: 0 };
+            score = 0;
+            speed = 150;
+            gameRunning = false;
+            gamePaused = true;
+            foods = [];
+            document.getElementById("score").textContent = score;
+            for (let i = 0; i < 5; i++) {
+                placeFood();
+            }
+        }
+
+        const startButton = document.getElementById("startButton");
+        startButton.addEventListener("click", () => {
+            if (!gameRunning) {
+                gameRunning = true;
+                gamePaused = false;
+                startButton.style.display = "none";
+                drawGame();
+            }
+        });
+
+        const restartButton = document.getElementById("restartButton");
+        restartButton.addEventListener("click", () => {
+            resetGame();
+            startButton.style.display = "block";
+        });
+
+        const fullscreenButton = document.getElementById("fullscreenButton");
+        fullscreenButton.addEventListener("click", () => {
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else {
+                document.documentElement.requestFullscreen();
+            }
+        });
+
+        document.addEventListener("keydown", event => {
+            if (!gameRunning || gamePaused) {
+                gamePaused = false;
+            }
+            switch (event.key) {
+                case "w":
+                case "ArrowUp":
+                    if (direction.y === 0) pendingDirection = { x: 0, y: -1 };
+                    break;
+                case "s":
+                case "ArrowDown":
+                    if (direction.y === 0) pendingDirection = { x: 0, y: 1 };
+                    break;
+                case "a":
+                case "ArrowLeft":
+                    if (direction.x === 0) pendingDirection = { x: -1, y: 0 };
+                    break;
+                case "d":
+                case "ArrowRight":
+                    if (direction.x === 0) pendingDirection = { x: 1, y: 0 };
+                    break;
+                case " ":
+                    speed = 50;
+                    break;
+                case "f":
+                    if (document.fullscreenElement) {
+                        document.exitFullscreen();
+                    } else {
+                        document.documentElement.requestFullscreen();
+                    }
+                    break;
+            }
+        });
+
+        const upButton = document.getElementById("upButton");
+        const downButton = document.getElementById("downButton");
+        const leftButton = document.getElementById("leftButton");
+        const rightButton = document.getElementById("rightButton");
+
+        upButton.addEventListener("click", () => {
+            if (direction.y === 0) pendingDirection = { x: 0, y: -1 };
+            gamePaused = false;
+        });
+
+        downButton.addEventListener("click", () => {
+            if (direction.y === 0) pendingDirection = { x: 0, y: 1 };
+            gamePaused = false;
+        });
+
+        leftButton.addEventListener("click", () => {
+            if (direction.x === 0) pendingDirection = { x: -1, y: 0 };
+            gamePaused = false;
+        });
+
+        rightButton.addEventListener("click", () => {
+            if (direction.x === 0) pendingDirection = { x: 1, y: 0 };
+            gamePaused = false;
+        });
+
+        resetGame();
+    </script>
+</body>
+</html>
